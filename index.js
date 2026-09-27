@@ -12,7 +12,7 @@ app.set('trust proxy', 1); // trust the first proxy hop (Render's load balancer)
 
 dotenv.config()
 const allowedOrigins = [
-  'https://invoice-dashboard-sepia-eta.vercel.app/',
+  'https://invoice-dashboard-sepia-eta.vercel.app',
   'http://localhost:5173',
 ];
 
