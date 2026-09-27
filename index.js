@@ -8,6 +8,7 @@ const rateLimit = require('express-rate-limit');
 const {generateInvoicePDF} = require("./helper/generateInvoice")
 const {sendInvoiceEmail} = require("./helper/sendInvoiceEmail")
 const app = express();
+app.set('trust proxy', 1); // trust the first proxy hop (Render's load balancer)
 
 dotenv.config()
 app.use(cors());
