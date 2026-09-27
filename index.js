@@ -11,7 +11,21 @@ const app = express();
 app.set('trust proxy', 1); // trust the first proxy hop (Render's load balancer)
 
 dotenv.config()
-app.use(cors());
+const allowedOrigins = [
+  'https://invoice-dashboard-sepia-eta.vercel.app/',
+  'http://localhost:5173',
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+}));
+
 const demoLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 3,
