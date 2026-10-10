@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "build": "tsc",
+  "start": "node dist/index.js",
+  "dev": "npx tsx watch src/index.ts"
   },
   "keywords": [],
   "author": "",
@@ -19,5 +21,11 @@
     "nodemailer": "^10.0.9",
     "pdfkit": "^0.20.2",
     "resend": "^6.30.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.4",
+    "typescript": "^7.0.2"
   }
 }

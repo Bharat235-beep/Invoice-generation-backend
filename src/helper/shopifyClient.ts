@@ -2,13 +2,13 @@ require('dotenv').config();
 
 const BASE_URL = `https://${process.env.SHOP_NAME}.myshopify.com/admin/api/${process.env.API_VERSION}`;
 
-async function shopifyFetch(path, options = {}) {
+async function shopifyFetch(path:string, options:RequestInit = {}):Promise<any> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: {
-      'X-Shopify-Access-Token': process.env.SHOPIFY_ACCESS_TOKEN,
+      'X-Shopify-Access-Token': process.env.SHOPIFY_ACCESS_TOKEN as string,
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(options.headers as Record<string, string>),
     },
   });
 
@@ -21,11 +21,11 @@ async function shopifyFetch(path, options = {}) {
 }
 
 const GRAPHQL_URL = `https://${process.env.SHOP_NAME}.myshopify.com/admin/api/${process.env.API_VERSION}/graphql.json`;
-async function shopifyGraphQL(query, variables = {}) {
+async function shopifyGraphQL(query: string, variables:Record<string,any> = {}): Promise<any> {
   const res = await fetch(GRAPHQL_URL, {
     method: 'POST',
     headers: {
-      'X-Shopify-Access-Token': process.env.SHOPIFY_ACCESS_TOKEN,
+      'X-Shopify-Access-Token': process.env.SHOPIFY_ACCESS_TOKEN as string,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ query, variables }),

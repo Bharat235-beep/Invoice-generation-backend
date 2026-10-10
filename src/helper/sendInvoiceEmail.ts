@@ -4,7 +4,7 @@ function getResendClient() {
   return new Resend(process.env.RESEND_API_KEY); // lazy init, same pattern as before — avoids env var load-order bugs
 }
 
-async function sendInvoiceEmail(toEmail, pdfBuffer, orderNumber) {
+async function sendInvoiceEmail(toEmail: string, pdfBuffer: Buffer, orderNumber: string): Promise<any> {
   const resend = getResendClient();
 
   const { data, error } = await resend.emails.send({

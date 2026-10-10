@@ -8,6 +8,10 @@ A Node.js/Express service that listens for Shopify order-payment webhooks, gener
 
 > Note: the backend is hosted on Render's free tier, which spins down after 15 minutes of inactivity. The first request after idle time may take 30–60 seconds to respond.
 
+## Known limitation
+
+The public demo route (`/api/demo/send-invoice`) currently sends real email through Resend's sandbox mode, which only allows delivery to the email address the Resend account was registered with. Sending to arbitrary recipients requires verifying a custom sending domain (DNS-level verification), which hasn't been set up for this project. In production, this is a one-time domain verification step — not a code or architecture limitation.
+
 ## What it does
 
 1. A Shopify custom app is installed on a development store with `orders/paid` webhook access.
@@ -36,7 +40,7 @@ A `GET /api/invoices/:id/pdf` route regenerates the same PDF on demand for the d
 | GET | `/api/invoices` | List all processed invoices |
 | GET | `/api/invoices/:id/pdf` | Regenerate and stream a specific invoice PDF |
 | POST | `/webhooks/orders/paid` | Shopify webhook receiver (HMAC-verified) |
-| POST | `/api/demo/send-invoice` | Public demo route — sends a sample invoice PDF to any email, rate-limited to 3 requests/hour per IP |
+| POST | `/api/demo/send-invoice` | Public demo route — sends a sample invoice PDF to any email, rate-limited to 3 requests/hour per IP. See "Known limitation" above. |
 
 ## Environment variables
 

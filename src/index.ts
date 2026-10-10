@@ -1,11 +1,14 @@
+import { Request, Response } from 'express';
 const express = require("express");
 const dotenv = require("dotenv");
 const cors = require('cors');
 const crypto = require("crypto")
-const Invoice = require("./models/invoices");
-const connectDB = require("./helper/db")
-const rateLimit = require('express-rate-limit');
+const Invoice = require('./models/Invoices').default;
+const connectDB = require("./helper/db").default;
+import rateLimit from 'express-rate-limit';
 const {generateInvoicePDF} = require("./helper/generateInvoice")
+import { IInvoice } from './models/Invoices';
+import { HydratedDocument } from 'mongoose';
 const {sendInvoiceEmail} = require("./helper/sendInvoiceEmail")
 const app = express();
 app.set('trust proxy', 1); // trust the first proxy hop (Render's load balancer)
@@ -17,7 +20,7 @@ const allowedOrigins = [
 ];
 
 app.use(cors({
-  origin: function (origin, callback) {
+  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -31,14 +34,25 @@ const demoLimiter = rateLimit({
   max: 3,
   message: { error: 'Too many requests, please try again in an hour.' },
 });
-
-app.post('/webhooks/orders/paid', express.raw({ type: 'application/json' }), async (req, res) => {
+interface ShopifyOrderPayload {
+  id: number;
+  email: string;
+  order_number?: number;
+  name?: string;
+  total_price: string;
+  customer?: { first_name: string; last_name: string };
+  line_items: { title: string; quantity: number; price: string }[];
+}
+app.post('/webhooks/orders/paid', express.raw({ type: 'application/json' }), async (req:Request, res:Response) => {
   try {
     const hmacHeader = req.headers['x-shopify-hmac-sha256'];
+    if (!hmacHeader || typeof hmacHeader !== 'string') {
+      return res.status(401).send('Unauthorized');
+    }
     const body = req.body;
 
     const generatedHash = crypto
-      .createHmac('sha256', process.env.SHOPIFY_API_SECRET)
+      .createHmac('sha256', process.env.SHOPIFY_API_SECRET as string)
       .update(body)
       .digest('base64');
 
@@ -55,14 +69,21 @@ app.post('/webhooks/orders/paid', express.raw({ type: 'application/json' }), asy
 
     // Everything below runs AFTER responding
     processOrder(order).catch((err) => {
-      console.error('Failed to process order:', err.message);
+      if (err instanceof Error) {
+        console.error('Failed to process order:', err.message);
+      }
     });
   } catch (err) {
-    console.error('Webhook error:', err.message);
-    if (!res.headersSent) res.status(500).send('Error');
+    if(err instanceof Error){
+      console.error('Webhook error:', err.message);
+      if (!res.headersSent) res.status(500).send('Error');
+    }
+    else{
+      res.status(500).send('Error');
+    }
   }
 });
-app.get('/api/invoices/:id/pdf', async (req, res) => {
+app.get('/api/invoices/:id/pdf', async (req:Request, res:Response) => {
   try {
     const invoice = await Invoice.findById(req.params.id);
     if (!invoice) return res.status(404).send('Invoice not found');
@@ -83,18 +104,26 @@ app.get('/api/invoices/:id/pdf', async (req, res) => {
     res.send(pdfBuffer);
   } catch (err) {
     console.log("Error",err)
-    res.status(500).json({ error: err.message });
+    let message:string = "Error";
+    if (err instanceof Error) {
+      message = err.message
+    }
+    res.status(500).json({ error: message });
   }
 });
-app.get('/api/invoices', async (req, res) => {
+app.get('/api/invoices', async (req: Request, res: Response) => {
   try {
     const invoices = await Invoice.find().sort({ createdAt: -1 });
     res.json(invoices);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    let message:string = "Error";
+    if (err instanceof Error) {
+      message = err.message
+    }
+    res.status(500).json({ error: message });
   }
 });
-app.post('/api/demo/send-invoice', demoLimiter,express.json(), async (req, res) => {
+app.post('/api/demo/send-invoice', demoLimiter,express.json(), async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
     console.log("Body---",req.body);
@@ -119,15 +148,19 @@ app.post('/api/demo/send-invoice', demoLimiter,express.json(), async (req, res) 
 
     res.json({ success: true, message: 'Demo invoice sent!' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    let message:string = "Error";
+    if (err instanceof Error) {
+      message = err.message
+    }
+    res.status(500).json({ error: message });
   }
 });
-async function processOrder(order) {
+async function processOrder(order:ShopifyOrderPayload) {
   if (!order.email) return;
 
   const invoiceData = {
     shopifyOrderId: String(order.id),
-    orderNumber: order.order_number || order.name,
+    orderNumber: String(order.order_number || order.name || 'unknown'),
     customerName: order.customer
       ? `${order.customer.first_name} ${order.customer.last_name}`
       : 'Guest',
@@ -147,7 +180,7 @@ async function processOrder(order) {
     return;
   }
 
-  let invoice;
+  let invoice: HydratedDocument<IInvoice>;
   if (existing) {
     // retry case: update the existing record instead of creating a duplicate
     Object.assign(existing, invoiceData);
@@ -167,8 +200,11 @@ async function processOrder(order) {
     invoice.emailSentAt = new Date();
     invoice.emailError = undefined; // clear any stale error from a previous failed attempt
   } catch (emailErr) {
-    invoice.emailStatus = 'failed';
-    invoice.emailError = emailErr.message;
+    if(emailErr instanceof Error){
+      invoice.emailStatus = 'failed';
+      invoice.emailError = emailErr.message;
+    }
+
   }
 
   await invoice.save();

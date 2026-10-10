@@ -2,12 +2,27 @@
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
-function generateInvoicePDF(order) {
+
+interface ILineItem {
+  title: string;
+  quantity: number;
+  price: number;
+}
+interface InvoiceData{
+      orderNumber: string,
+      createdAt: string | Date,
+      customerName: string,
+      customerEmail: string,
+      totalPrice: number,
+      lineItems: ILineItem[],
+    }
+
+function generateInvoicePDF(order:InvoiceData): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50 });
-    const chunks = [];
+    const chunks:Buffer[] = [];
 
-    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('data', (chunk:Buffer) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
