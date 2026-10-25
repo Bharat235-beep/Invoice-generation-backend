@@ -3,12 +3,16 @@ const express = require("express");
 const dotenv = require("dotenv");
 const cors = require('cors');
 const crypto = require("crypto")
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import User from './models/User';
 const Invoice = require('./models/Invoices').default;
 const connectDB = require("./helper/db").default;
 import rateLimit from 'express-rate-limit';
 const {generateInvoicePDF} = require("./helper/generateInvoice")
 import { IInvoice } from './models/Invoices';
 import { HydratedDocument } from 'mongoose';
+import requireAuth,{requireAdmin} from "./middleware/requireAuth"
 const {sendInvoiceEmail} = require("./helper/sendInvoiceEmail")
 const app = express();
 app.set('trust proxy', 1); // trust the first proxy hop (Render's load balancer)
@@ -34,6 +38,13 @@ const demoLimiter = rateLimit({
   max: 3,
   message: { error: 'Too many requests, please try again in an hour.' },
 });
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many login attempts, please try again later.' },
+});
+
+
 interface ShopifyOrderPayload {
   id: number;
   email: string;
@@ -43,6 +54,33 @@ interface ShopifyOrderPayload {
   customer?: { first_name: string; last_name: string };
   line_items: { title: string; quantity: number; price: string }[];
 }
+app.get('/api/admin-check', requireAuth, requireAdmin, (req:Request, res:Response) => res.json({ ok: true }));
+app.post('/api/auth/login', loginLimiter, express.json(), async (req: Request, res: Response) => {
+  try {
+  const { email, password } = req.body;
+  if (typeof email !== 'string' || typeof password !== 'string') {
+    return res.status(400).json({ error: 'Email and password required' });
+  }
+
+  const user = await User.findOne({ email: email.toLowerCase() });
+console.log('user found:', !!user);
+if (user) {
+  console.log('password matches:', await bcrypt.compare(password, user.passwordHash));
+}
+  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+    return res.status(401).json({ error: 'Invalid email or password' });
+  }
+
+  const token = jwt.sign({ userId: user.id, role: user.role }, process.env.JWT_SECRET as string, { expiresIn: '1d' });
+  res.json({ token });
+  } catch (err) {
+    let message:string = "Error";
+    if (err instanceof Error) {
+      message = err.message
+    }
+    res.status(500).json({ error: message });
+  }
+});
 app.post('/webhooks/orders/paid', express.raw({ type: 'application/json' }), async (req:Request, res:Response) => {
   try {
     const hmacHeader = req.headers['x-shopify-hmac-sha256'];
@@ -83,7 +121,7 @@ app.post('/webhooks/orders/paid', express.raw({ type: 'application/json' }), asy
     }
   }
 });
-app.get('/api/invoices/:id/pdf', async (req:Request, res:Response) => {
+app.get('/api/invoices/:id/pdf',requireAuth, async (req:Request, res:Response) => {
   try {
     const invoice = await Invoice.findById(req.params.id);
     if (!invoice) return res.status(404).send('Invoice not found');
@@ -111,7 +149,7 @@ app.get('/api/invoices/:id/pdf', async (req:Request, res:Response) => {
     res.status(500).json({ error: message });
   }
 });
-app.get('/api/invoices', async (req: Request, res: Response) => {
+app.get('/api/invoices',requireAuth, async (req: Request, res: Response) => {
   try {
     const invoices = await Invoice.find().sort({ createdAt: -1 });
     res.json(invoices);
