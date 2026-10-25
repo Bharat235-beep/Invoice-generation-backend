@@ -54,7 +54,6 @@ interface ShopifyOrderPayload {
   customer?: { first_name: string; last_name: string };
   line_items: { title: string; quantity: number; price: string }[];
 }
-app.get('/api/admin-check', requireAuth, requireAdmin, (req:Request, res:Response) => res.json({ ok: true }));
 app.post('/api/auth/login', loginLimiter, express.json(), async (req: Request, res: Response) => {
   try {
   const { email, password } = req.body;
@@ -102,7 +101,7 @@ app.post('/webhooks/orders/paid', express.raw({ type: 'application/json' }), asy
     if (!trusted) return res.status(401).send('Unauthorized');
 
     const order = JSON.parse(body);
-    console.log("Order--",order)
+    // console.log("Order--",order)
     res.status(200).send('OK'); // respond fast, Shopify doesn't need to wait for the rest
 
     // Everything below runs AFTER responding
